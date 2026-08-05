@@ -1,9 +1,7 @@
 #include "raylib.h"
 #include "raymath.h"
 
-// Function for the Denavit-Haitenberg parameters (a, d, theta, alpha) 
-// Performas a 4x4 matrix transformation using the parameters 
-// Formula = Rz(theta) . Tz(d) . Tx(a) . Rx(alpha)   IN THAT ORDER
+// Code structure: STRUCTURES, FUNCTIONS, MAIN
 
 // ======== NEW STRUCTS ========
 
