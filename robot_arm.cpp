@@ -120,7 +120,7 @@ void ForwardKinematics(float theta[6], DHRow joints[6], Vector3 jointPositions[7
 
 // Will compute matrix from a damped least-squares formula:  A = J·J^T + λ²I
 
-float IKstep(float theta[6], DHRow joints[6], Vector3 target, float lambda) {
+float IKstep(float theta[6], DHRow joints[6], Vector3 target, float lambda, float thetaMin[6], float thetaMax[6]) {
     // Initialise joint positions vector and combined  matrices and recompute the FK 
     Vector3 jointPositions[7]; 
     Matrix combinedMatrices[7]; 
@@ -194,6 +194,8 @@ float IKstep(float theta[6], DHRow joints[6], Vector3 target, float lambda) {
             d = -thetaVelMax;
         };
         theta[i] += d;
+        // Limit max and min theta values 
+        theta[i] = Clamp(theta[i], thetaMin[i], thetaMax[i]);
     };
     
     // So we know until its converged.
@@ -250,6 +252,10 @@ int main() {
     
     // Initial theta values (update live)
     float theta[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    // Set min and max theta values to represent the joint limits and avoids breaking. Can be modified for different motors/robot-settings.
+    // CURRENT: base values for kuka robot 
+    float thetaMin[6] = { -180*DEG2RAD, -90*DEG2RAD, -150*DEG2RAD, -180*DEG2RAD, -120*DEG2RAD, -180*DEG2RAD };
+    float thetaMax[6] = { 180*DEG2RAD, 90*DEG2RAD, 150*DEG2RAD, 180*DEG2RAD, 120*DEG2RAD, 180*DEG2RAD };
     
     // Variables for arm movement
     int selectedJoint = 0; // Which joint selected 
@@ -264,6 +270,7 @@ int main() {
     
     // Variable for damping FK calc when target surpasses arm reach 
     float lambda = 0.05f;
+    
    
     
     // ======= MAIN 3D LOOP ========
@@ -320,6 +327,7 @@ int main() {
         // Increased or decreasing theta at SpeedJoint per frame-tick for keys held down. O and P used for accessability
         if (IsKeyDown(KEY_O)) theta[selectedJoint] += SpeedJoint;
         if (IsKeyDown(KEY_P)) theta[selectedJoint] -= SpeedJoint;
+        theta[selectedJoint] = Clamp(theta[selectedJoint], thetaMin[selectedJoint], thetaMax[selectedJoint]);
         
         
         
@@ -342,7 +350,7 @@ int main() {
         
         // Main calc
         if (TargMode) {
-            IKstep(theta, joints, tempFixedReach, lambda);
+            IKstep(theta, joints, tempFixedReach, lambda, thetaMin, thetaMax);
         } ;
         
         // Call Kinematics function
