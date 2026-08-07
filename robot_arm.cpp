@@ -1,5 +1,7 @@
 #include "raylib.h"
 #include "raymath.h"
+#include <vector>
+#include <string>
 
 // Code structure: STRUCTURES, FUNCTIONS, MAIN
 
@@ -120,7 +122,7 @@ void ForwardKinematics(float theta[6], DHRow joints[6], Vector3 jointPositions[7
 
 // Will compute matrix from a damped least-squares formula:  A = J·J^T + λ²I
 
-float IKstep(float theta[6], DHRow joints[6], Vector3 target, float lambda, float thetaMin[6], float thetaMax[6]) {
+float IKstep(float theta[6], DHRow joints[6], Vector3 target, float lambda, float thetaMin[6], float thetaMax[6], bool limitJointsMode) {
     // Initialise joint positions vector and combined  matrices and recompute the FK 
     Vector3 jointPositions[7]; 
     Matrix combinedMatrices[7]; 
@@ -195,7 +197,9 @@ float IKstep(float theta[6], DHRow joints[6], Vector3 target, float lambda, floa
         };
         theta[i] += d;
         // Limit max and min theta values 
+        if (limitJointsMode) {
         theta[i] = Clamp(theta[i], thetaMin[i], thetaMax[i]);
+        };
     };
     
     // So we know until its converged.
@@ -251,6 +255,7 @@ int main() {
     };
     
     // Initial theta values (update live)
+    bool limitJointsMode = true; // Toggle the limiting of Joints
     float theta[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     // Set min and max theta values to represent the joint limits and avoids breaking. Can be modified for different motors/robot-settings.
     // CURRENT: base values for kuka robot 
@@ -271,10 +276,33 @@ int main() {
     // Variable for damping FK calc when target surpasses arm reach 
     float lambda = 0.05f;
     
+    
+    // ======= PATHWAY TRACING VARIABLES & SHAPES ========
+    
+    // Points for tracing out a pathway
+    const int waypointAmount = 100; // Used for reverting back
+    std::vector<Vector3> tracePoints;
+    // Create circle of points 
+    float traceCircleRadius = 0.68f;
+    float traceCircleAngle = 0.0f;
+   
+    
+    for (int i=0; i<waypointAmount; i++) {
+       tracePoints.push_back({traceCircleRadius*std::cos(traceCircleAngle*DEG2RAD), traceCircleRadius*std::sin(traceCircleAngle*DEG2RAD), traceCircleRadius*std::cos(traceCircleAngle*DEG2RAD)*traceCircleRadius*std::cos(traceCircleAngle*DEG2RAD)});
+       traceCircleAngle += (360.0f/waypointAmount);
+    };
+    
+    int currentWaypoint = 0;
+    float arrivalAccuracy = 0.02f; // Once within this pixel accuracy, move onto the next point
+    bool pathwayMode = false;
+    
+    
    
     
     // ======= MAIN 3D LOOP ========
     while (!WindowShouldClose()) {
+        
+        // ========================== USER INTERACTION ==========================
         
         // ======== CAMERA INTERACTION ==========
         float moveSpeed = 0.05f; // Movement of camera from WASD keys
@@ -302,7 +330,7 @@ int main() {
         if (IsKeyPressed(KEY_ZERO)) TargMode = !TargMode; // Target mode controlled by button 0
         
         // Moving the target coordinate with the camera 
-       if (TargMode) {
+        if (TargMode) {
            float targetMove = 0.01f;
            if (IsKeyDown(KEY_UP)) camTarget.z += targetMove;
            if (IsKeyDown(KEY_DOWN)) camTarget.z -= targetMove;
@@ -310,11 +338,19 @@ int main() {
            if (IsKeyDown(KEY_E)) camTarget.y -= targetMove; 
            if (IsKeyDown(KEY_LEFT)) camTarget.x += targetMove;
            if (IsKeyDown(KEY_RIGHT)) camTarget.x -= targetMove;   
+        }; 
+        
+       
+       
+       // ========= PATHWAY INTERACTION =========
+       if (IsKeyPressed(KEY_R)) {
+           pathwayMode = !pathwayMode;
+           if (pathwayMode) TargMode = true;
        };
         
         
         
-        // ========= USER INTERACTION ==========
+        // ========= MOVEMENT INTERACTION ==========
         
         // Input for which join to be moved, using keys 1-6 to select 
         if (IsKeyPressed(KEY_ONE)) selectedJoint = 0;
@@ -324,14 +360,21 @@ int main() {
         if (IsKeyPressed(KEY_FIVE)) selectedJoint = 4;
         if (IsKeyPressed(KEY_SIX)) selectedJoint = 5;
         
-        // Increased or decreasing theta at SpeedJoint per frame-tick for keys held down. O and P used for accessability
+        // Increased or decreasing theta at SpeedJoint per frame-tick for keys held down. O and P used for accessability. Also adding the limiting joints only if the mode is targeted
         if (IsKeyDown(KEY_O)) theta[selectedJoint] += SpeedJoint;
         if (IsKeyDown(KEY_P)) theta[selectedJoint] -= SpeedJoint;
+        if (limitJointsMode) {
         theta[selectedJoint] = Clamp(theta[selectedJoint], thetaMin[selectedJoint], thetaMax[selectedJoint]);
+        };
+        
+        // ========= LIMITING JOINTS TOGGLE ===========
+        if (IsKeyPressed(KEY_L)) limitJointsMode = !limitJointsMode;
         
         
         
-        // ========= CALCULATIONS / FORWARD KINEMATICS ========
+        
+        
+        // ================== CALCULATIONS / FORWARD KINEMATICS ================
         
         
         // IF CAM TARGET MODE IS ACTIVE, the arm will automatically move its joints to the correct target. If not, a separate simulation is present where you can control each arm at your own preference.
@@ -339,6 +382,11 @@ int main() {
 
         Vector3 jointPositions[7];
         Matrix combinedMatrices[7];
+        
+        // Pathway Mode Initiation 
+        if (pathwayMode) {
+            camTarget = tracePoints[currentWaypoint];
+        };
         
         // Create a fixed position for when the coordinates are out of reach.
         Vector3 tempFixedReach = camTarget;
@@ -349,12 +397,20 @@ int main() {
         };
         
         // Main calc
+        float targetDistance = 0.0f;
         if (TargMode) {
-            IKstep(theta, joints, tempFixedReach, lambda, thetaMin, thetaMax);
+            targetDistance = IKstep(theta, joints, tempFixedReach, lambda, thetaMin, thetaMax, limitJointsMode);
         } ;
+        
+        if (pathwayMode && targetDistance < arrivalAccuracy) {
+            currentWaypoint = (currentWaypoint + 1) % waypointAmount; // Goes in incrememnts of 1 and comes back to the final
+        };
+        
         
         // Call Kinematics function
         ForwardKinematics(theta, joints, jointPositions, combinedMatrices);
+        
+        
         
         
         
@@ -377,6 +433,13 @@ int main() {
         // Last joint has a distinguishable colour (end point of arm)
         DrawSphere(jointPositions[6], 0.03f, GREEN);
         
+        // Pathway trajectory
+        for (int i=0; i<waypointAmount; i++) {
+            Color c = (i == currentWaypoint) ? YELLOW : GRAY;
+            float r = (i == currentWaypoint) ? 0.025f : 0.015f;
+            DrawSphere(tracePoints[i], r, c);
+        };
+        
         EndMode3D();
         
         // TEXT
@@ -385,8 +448,15 @@ int main() {
         DrawText(TextFormat("Selected joint: %d (select keys 1-6 for specifict joints)", selectedJoint+1), 10, 40, 20, BLACK);
         DrawText(TextFormat("theta[%d} = %.1f degrees", selectedJoint, theta[selectedJoint] * RAD2DEG), 10, 70, 20, BLACK);
         
+        // Targeting Mode
         DrawText(TextFormat("Inverse Kinematics Targeting: %s (0 to toggle, arrows and E,Q to move)", TargMode ? "ACTIVE" : "NOT"), 10, 100, 20, RED);
         DrawText(TextFormat("Target coord: %.3f %.3f %.3f", camTarget.x, camTarget.y, camTarget.z), 10, 130, 20, BLACK);
+        
+        // Pathway mode 
+        DrawText(TextFormat("Pathway mode: %s (Key R)", pathwayMode ? "ON" : "OFF"), 10, 160, 20, DARKGREEN);
+        
+        // Toggle Joint Angle Limits
+        DrawText(TextFormat("Limit Joint Angles Mode: %s (Key L)", limitJointsMode ? "ON" : "OFF"), 10, 190, 20, DARKGREEN);
         
         
         EndDrawing();
