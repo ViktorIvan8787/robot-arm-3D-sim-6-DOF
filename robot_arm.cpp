@@ -153,7 +153,7 @@ float IKstep(float theta[6], DHRow joints[6], Vector3 target, float lambda, floa
     float Yoshikawa = sqrtf(fabsf(det3x3(JJt))); // Manipubility measure
     
     // Different lambda values for different positions 
-    float lambdaMin = 0.01f, lambdaMax = 0.3f, threshold = 0.05df;
+    float lambdaMin = 0.01f, lambdaMax = 0.3f, threshold = 0.05f;
     
     // Linear relationship between lambda and the damping constant (the further the target is from arm reach, the less the arm looks for a solution)
     float lambdaEff = lambdaMin;
@@ -208,6 +208,63 @@ float IKstep(float theta[6], DHRow joints[6], Vector3 target, float lambda, floa
 };
 
 
+// Function applied different pathways once a different shape is toggled
+std::vector<Vector3> CreatePathwayPoints(int toggleShape, float radius, int& waypointAmount) {
+    // Initialize Points
+    std::vector<Vector3> tracePoints;
+    if (toggleShape == 0) {
+        // None
+        waypointAmount = 0;
+        
+    } if (toggleShape == 1) {
+        // Pick and Place pathway 
+        waypointAmount = 8;
+        tracePoints = {
+            {0.4f, 0.0f, 0.0f},
+            {0.4f, 0.0f, 0.4f},
+            {0.0f, 0.4f, 0.4f},
+            {0.0f, 0.4f, 0.0f},
+            {0.0f, 0.4f, 0.4f},
+            {-0.4f, 0.0f, 0.4f},
+            {-0.4f, 0.0f, 0.0f},
+            {-0.4f, 0.0f, 0.4f}
+        };
+            
+    } if (toggleShape == 2) {
+        // Cube 
+        waypointAmount = 8; 
+        tracePoints = {
+            {-0.3f, 0.3f, 0.3f},
+            {-0.3f, -0.3f, 0.3f},
+            {-0.3f, -0.3f, -0.3f},
+            {0.3f, -0.3f, -0.3f},
+            {-0.3f, 0.3f, -0.3f},
+            {0.3f, -0.3f, 0.3f},
+            {0.3f, 0.3f, -0.3f},
+            {0.3f, 0.3f, 0.3f}
+        };
+        
+    } if (toggleShape == 3) {
+        // Circle 
+        float angle = 0.0f;
+        waypointAmount = 100;
+        for (int i=0; i<waypointAmount; i++) {
+            tracePoints.push_back({radius*std::cos(angle*DEG2RAD), radius*std::sin(angle*DEG2RAD), 0.0f});
+            angle += (360.0f/waypointAmount);
+        };
+    } if (toggleShape == 4) {
+        float angle = 0.0f;
+        // Pringle 
+        waypointAmount = 100;
+        for (int i=0; i<waypointAmount; i++) {
+            tracePoints.push_back({radius*std::cos(angle*DEG2RAD), radius*std::sin(angle*DEG2RAD), radius*std::cos(angle*DEG2RAD)*radius*std::cos(angle*DEG2RAD)});
+            angle += (360.0f/waypointAmount);
+        };
+    };
+    
+    return tracePoints;
+    
+};
 
 
 
@@ -280,17 +337,17 @@ int main() {
     // ======= PATHWAY TRACING VARIABLES & SHAPES ========
     
     // Points for tracing out a pathway
-    const int waypointAmount = 100; // Used for reverting back
-    std::vector<Vector3> tracePoints;
+    int waypointAmount = 0; // Used for reverting back
     // Create circle of points 
-    float traceCircleRadius = 0.68f;
-    float traceCircleAngle = 0.0f;
-   
+    float traceCircleRadius = 0.67f;
+    float traceCircleAngle = 0.0f;  
     
-    for (int i=0; i<waypointAmount; i++) {
-       tracePoints.push_back({traceCircleRadius*std::cos(traceCircleAngle*DEG2RAD), traceCircleRadius*std::sin(traceCircleAngle*DEG2RAD), traceCircleRadius*std::cos(traceCircleAngle*DEG2RAD)*traceCircleRadius*std::cos(traceCircleAngle*DEG2RAD)});
-       traceCircleAngle += (360.0f/waypointAmount);
-    };
+    // Different pathways to toggle through
+    std::vector<std::string> shapes = {"None", "Pick-and-Place", "Cube", "Circle", "Pringle"};
+    int toggleShape = 0;
+    std::string currentShape = shapes[toggleShape];
+
+    std::vector<Vector3> tracePoints = CreatePathwayPoints(toggleShape, traceCircleRadius, waypointAmount);
     
     int currentWaypoint = 0;
     float arrivalAccuracy = 0.02f; // Once within this pixel accuracy, move onto the next point
@@ -343,12 +400,20 @@ int main() {
        
        
        // ========= PATHWAY INTERACTION =========
-       if (IsKeyPressed(KEY_R)) {
-           pathwayMode = !pathwayMode;
-           if (pathwayMode) TargMode = true;
-       };
+        if (IsKeyPressed(KEY_V)) {
+            if (waypointAmount > 0) { // only allow pathway mode when there's an actual path to follow
+                pathwayMode = !pathwayMode;
+                if (pathwayMode) TargMode = true;
+            }
+        };
         
-        
+        if (IsKeyPressed(KEY_C)) {
+            toggleShape = (toggleShape + 1) % (int)shapes.size();
+            currentShape = shapes[toggleShape];
+            tracePoints = CreatePathwayPoints(toggleShape, traceCircleRadius, waypointAmount);
+            currentWaypoint = 0;
+            if (waypointAmount == 0) pathwayMode = false; // When we go back to "None" pathway mode turns off and no points to follow
+        };
         
         // ========= MOVEMENT INTERACTION ==========
         
@@ -452,11 +517,12 @@ int main() {
         DrawText(TextFormat("Inverse Kinematics Targeting: %s (0 to toggle, arrows and E,Q to move)", TargMode ? "ACTIVE" : "NOT"), 10, 100, 20, RED);
         DrawText(TextFormat("Target coord: %.3f %.3f %.3f", camTarget.x, camTarget.y, camTarget.z), 10, 130, 20, BLACK);
         
-        // Pathway mode 
-        DrawText(TextFormat("Pathway mode: %s (Key R)", pathwayMode ? "ON" : "OFF"), 10, 160, 20, DARKGREEN);
+        // Pathway mode and pathway toggles
+        DrawText(TextFormat("Pathway mode: %s (Key V)", pathwayMode ? "ON" : "OFF"), 10, 160, 20, DARKGREEN);
+        DrawText(TextFormat("Current Shape: %s (Key C)", currentShape.c_str()), 10, 190, 20, DARKGREEN);
         
         // Toggle Joint Angle Limits
-        DrawText(TextFormat("Limit Joint Angles Mode: %s (Key L)", limitJointsMode ? "ON" : "OFF"), 10, 190, 20, DARKGREEN);
+        DrawText(TextFormat("Limit Joint Angles Mode: %s (Key L)", limitJointsMode ? "ON" : "OFF"), 10, 220, 20, DARKGREEN);
         
         
         EndDrawing();
