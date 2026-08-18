@@ -16,7 +16,7 @@ constexpr int kWindowHeight = 700;
 constexpr int kTargetFramesPerSecond = 60;
 
 constexpr float kCameraMovementSpeed = 3.0f;
-constexpr float kCameraMouseSensitivity = 0.8f;
+constexpr float kCameraMouseSensitivity = 0.7;
 constexpr float kCameraZoomSpeed = 2.0f;
 constexpr float kTargetMovementSpeed = 0.6f;
 constexpr float kManualJointSpeed = 60.0f * DEG2RAD;
@@ -35,7 +35,7 @@ struct SimulationState {
     // ======== WINDOW AND 3D ========
     Camera3D camera {};
     // Variables for coordinate targeting with the camera
-    Vector3 target {0.4f, 0.3f, 0.5f};
+    Vector3 target {0.0f, 0.3f, 0.3f};
 
     // Variables for arm movement
     std::size_t selectedJoint = 0;
@@ -74,9 +74,9 @@ void initialiseSimulation(SimulationState& state)
 {
     // Setting up 3D camera
     // Where camera is in space
-    state.camera.position = {2.0f, 2.0f, 2.0f};
+    state.camera.position = {1.0f, 1.0f, 1.0f};
     // Point camera is looking at
-    state.camera.target = {0.0f, 0.0f, 0.0f};
+    state.camera.target = {0.0f, 0.5f, 0.0f};
     // For the camera, y axis is upwards
     state.camera.up = {0.0f, 1.0f, 0.0f};
     // Field of view
@@ -125,9 +125,6 @@ void selectJointFromKeyboard(SimulationState& state)
 void updateTargetFromKeyboard(SimulationState& state, float deltaTime)
 {
     // ========= TARGET INTERACTION ==========
-    if (!state.targetMode || state.pathwayMode) {
-        return;
-    }
 
     // Moving the target coordinate with the camera
     const float movement = kTargetMovementSpeed * deltaTime;
@@ -249,25 +246,25 @@ void drawRobot(const SimulationState& state, const robot_arm::JointPositions& po
 {
     // ========= DRAWING / TEXT / OUTPUT ==========
     BeginMode3D(state.camera);
-    DrawGrid(10, 0.5f);
+    DrawGrid(40, 0.05f);
     // Sphere for target coord
-    DrawSphere(flipZY(state.target), 0.03f, RED);
+    DrawSphere(flipZY(state.target), 0.018f, RED);
 
     // Sphere for each joint, cylinder for each arm. Modified varaibles just for the base
     for (std::size_t joint = 0; joint < robot_arm::kJointCount; ++joint) {
         if (joint == 0) 
         {
             DrawCylinderEx(flipZY(positions[joint]), flipZY(Vector3{0.0f, 0.0f, 0.195f}), 0.025f, 0.025f, 30, GRAY);
-            DrawCylinderEx(flipZY(positions[joint]), flipZY(positions[joint + 1]), 0.01f, 0.01f, 30, BLACK);
+            DrawCylinderEx(flipZY(positions[joint]), flipZY(positions[joint + 1]), 0.005f, 0.005f, 30, GRAY);
         }
          else 
         {
-            DrawCylinderEx(flipZY(positions[joint]), flipZY(positions[joint + 1]), 0.01f, 0.01f, 30, BLACK);
-            DrawSphere(flipZY(positions[joint]), 0.02f, DARKBLUE);
+            DrawCylinderEx(flipZY(positions[joint]), flipZY(positions[joint + 1]), 0.005f, 0.005f, 30, GRAY);
+            DrawSphere(flipZY(positions[joint]), 0.015f, BLACK);
         }
     }
     // Last joint has a distinguishable colour (end point of arm)
-    DrawSphere(flipZY(positions.back()), 0.03f, GREEN);
+    DrawSphere(flipZY(positions.back()), 0.017f, GREEN);
 
     // Pathway trajectory
     for (std::size_t index = 0; index < state.pathwayPoints.size(); ++index) {
@@ -284,9 +281,9 @@ void drawRobot(const SimulationState& state, const robot_arm::JointPositions& po
 void drawInterface(const SimulationState& state)
 {
     // Text showing user interaction with theta of the joints
-    DrawText("6 DOF Robot Arm :: Kinematics Prototype", 10, 10, 20, DARKGRAY);
+    DrawText("6 DOF Robot Arm :: FK & IK Kinematics Prototype", 10, 10, 20, DARKGRAY);
     DrawText(
-        TextFormat("Selected joint: %d (keys 1-6)",
+        TextFormat("Selected joint: %d [Buttons 1-6]",
                    static_cast<int>(state.selectedJoint + 1)),
         10,
         40,
@@ -301,7 +298,7 @@ void drawInterface(const SimulationState& state)
         20,
         BLACK);
     DrawText(
-        TextFormat("Inverse kinematics: %s (0 to toggle)",
+        TextFormat("Inverse kinematics: %s [0 to toggle, arrows + E,Q to navigate]",
                    state.targetMode ? "ACTIVE" : "OFF"),
         10,
         100,
@@ -318,20 +315,20 @@ void drawInterface(const SimulationState& state)
         20,
         BLACK);
     DrawText(
-        TextFormat("Pathway mode: %s (V)", state.pathwayMode ? "ON" : "OFF"),
+        TextFormat("Pathway mode: %s (Button V)", state.pathwayMode ? "ON" : "OFF"),
         10,
         160,
         20,
         DARKGREEN);
     DrawText(
-        TextFormat("Current shape: %s (C)",
+        TextFormat("Current shape: %s (Button C)",
                    robot_arm::pathwayName(state.pathwayShape).data()),
         10,
         190,
         20,
         DARKGREEN);
     DrawText(
-        TextFormat("Joint limits: %s (L)",
+        TextFormat("Joint limits: %s (Button L)",
                    state.enforceJointLimits ? "ON" : "OFF"),
         10,
         220,
