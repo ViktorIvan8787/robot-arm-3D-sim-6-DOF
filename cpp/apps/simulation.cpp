@@ -54,6 +54,11 @@ struct SimulationState {
     float targetDistance = 0.0f;
 };
 
+Vector3 flipZY(Vector3 dhPos) 
+{
+    return {dhPos.x, dhPos.z, dhPos.y};
+}
+
 float estimateMaximumReach(const robot_arm::RobotModel& model)
 {
     // Variable for maximum reach. Used to stop arm movement beyond physically
@@ -246,21 +251,29 @@ void drawRobot(const SimulationState& state, const robot_arm::JointPositions& po
     BeginMode3D(state.camera);
     DrawGrid(10, 0.5f);
     // Sphere for target coord
-    DrawSphere(state.target, 0.03f, RED);
+    DrawSphere(flipZY(state.target), 0.03f, RED);
 
-    // Sphere for each joint, cylinder for each arm
+    // Sphere for each joint, cylinder for each arm. Modified varaibles just for the base
     for (std::size_t joint = 0; joint < robot_arm::kJointCount; ++joint) {
-        DrawCylinderEx(positions[joint], positions[joint + 1], 0.01f, 0.01f, 30, BLACK);
-        DrawSphere(positions[joint], 0.02f, DARKBLUE);
+        if (joint == 0) 
+        {
+            DrawCylinderEx(flipZY(positions[joint]), flipZY(Vector3{0.0f, 0.0f, 0.195f}), 0.025f, 0.025f, 30, GRAY);
+            DrawCylinderEx(flipZY(positions[joint]), flipZY(positions[joint + 1]), 0.01f, 0.01f, 30, BLACK);
+        }
+         else 
+        {
+            DrawCylinderEx(flipZY(positions[joint]), flipZY(positions[joint + 1]), 0.01f, 0.01f, 30, BLACK);
+            DrawSphere(flipZY(positions[joint]), 0.02f, DARKBLUE);
+        }
     }
     // Last joint has a distinguishable colour (end point of arm)
-    DrawSphere(positions.back(), 0.03f, GREEN);
+    DrawSphere(flipZY(positions.back()), 0.03f, GREEN);
 
     // Pathway trajectory
     for (std::size_t index = 0; index < state.pathwayPoints.size(); ++index) {
         const bool isCurrent = index == state.currentWaypoint;
         DrawSphere(
-            state.pathwayPoints[index],
+            flipZY(state.pathwayPoints[index]),
             isCurrent ? 0.025f : 0.015f,
             isCurrent ? YELLOW : GRAY);
     }
