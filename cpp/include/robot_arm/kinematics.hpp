@@ -23,7 +23,8 @@ void forwardKinematics(
     const JointAngles& angles,
     const RobotModel& model,
     JointPositions& positions,
-    JointTransforms& transforms);
+    JointTransforms& transforms
+);
 
 // Performs one damped least-squares position-only IK iteration. This does not
 // solve TCP orientation and is not yet a complete trajectory planner.
@@ -32,6 +33,14 @@ float performIKStep(
     const RobotModel& model,
     Vector3 target,
     const IKSettings& settings,
-    bool enforceJointLimits);
+    bool enforceJointLimits
+);
+
+// Returns true if the robot has reached home position (home position defined by homeAngles in robot.hpp.)
+// This checks the angles are equal
+bool isAtHomeAngles(
+    const JointAngles& angles,
+    const JointAngles& home, 
+    float toleranceRadians = 0.05f);
 
 } // namespace robot_arm

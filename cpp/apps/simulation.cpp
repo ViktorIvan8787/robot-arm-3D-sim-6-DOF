@@ -280,6 +280,9 @@ void drawRobot(const SimulationState& state, const robot_arm::JointPositions& po
 
 void drawInterface(const SimulationState& state)
 {
+    // Checks if robot is at home angles. From kinematics.hpp 
+    const bool atHome = robot_arm::isAtHomeAngles(state.angles, state.model.homeAngles);
+
     // Text showing user interaction with theta of the joints
     DrawText("6 DOF Robot Arm :: FK & IK Kinematics Prototype", 10, 10, 20, DARKGRAY);
     DrawText(
@@ -334,6 +337,13 @@ void drawInterface(const SimulationState& state)
         220,
         20,
         DARKGREEN);
+    DrawText(
+        TextFormat("Home Postition: %s ", 
+                    (atHome) ? "YES" : "NO"),
+        10,
+        250,
+        20,
+        GRAY);
 }
 
 } // namespace

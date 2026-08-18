@@ -64,7 +64,7 @@ void computePositionJacobian(
 
     for (std::size_t joint = 0; joint < kJointCount; ++joint) {
         // Here we apply the formula for finding the direction and magnitude
-        // that the end joint moves per unit angle of the current joint.
+        // that the end joint moves per unit angle of the current joint. (Jacobian)
         // We get a pure direction vector from subtracting these two
         // transformed vectors and get the rotation's effect by seeing where
         // the z-point goes.
@@ -120,7 +120,8 @@ void forwardKinematics(
     for (std::size_t joint = 0; joint < kJointCount; ++joint) {
         const DHRow& parameters = model.joints[joint];
         const Matrix localTransform = dhTransform(
-            angles[joint], parameters.d, parameters.a, parameters.alpha);
+            // Adding thetaOffset to prevent the sicking of the joint to the side
+            angles[joint] + parameters.thetaOffset, parameters.d, parameters.a, parameters.alpha); 
 
         combined = MatrixMultiply(localTransform, combined);
         transforms[joint + 1] = combined;
@@ -224,6 +225,22 @@ float performIKStep(
 
     // So we know until it has converged.
     return Vector3Length(positionError);
+}
+
+// Returns true if the robot has reached home position (home position defined by homeAngles in robot.hpp.)
+// This checks the angles are equal and uses a tolerance value in radians to make the check more approximate. 
+bool isAtHomeAngles(
+    const JointAngles& angles,
+    const JointAngles& home,
+    float toleranceRadians)  
+{
+    // Joint count is declared in simulation.cpp
+    for (std::size_t joint = 0; joint < kJointCount; ++joint) {
+        if (std::fabs(angles[joint] - home[joint]) > toleranceRadians) {
+            return false;
+        }
+    }
+    return true;
 }
 
 } // namespace robot_arm
