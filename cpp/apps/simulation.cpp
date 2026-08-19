@@ -1,6 +1,8 @@
 #include "robot_arm/kinematics.hpp"
 #include "robot_arm/pathways.hpp"
 #include "robot_arm/robot.hpp"
+#include "simulation_state/simulation_state.hpp"
+#include "visual_representation/rendering.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -24,40 +26,7 @@ constexpr float kPathRadius = 0.67f;
 constexpr float kWaypointTolerance = 0.02f;
 constexpr float kReachSafetyFactor = 0.85f;
 
-struct SimulationState {
-    // ======== ARM VARIABLES / JOINT SPECS =========
-    robot_arm::RobotModel model = robot_arm::createDefaultRobotModel();
-    // Initial theta values (update live)
-    robot_arm::JointAngles angles = model.homeAngles;
-    // Variable for damping IK calc when target surpasses arm reach
-    robot_arm::IKSettings ikSettings {};
 
-    // ======== WINDOW AND 3D ========
-    Camera3D camera {};
-    // Variables for coordinate targeting with the camera
-    Vector3 target {0.0f, 0.3f, 0.3f};
-
-    // Variables for arm movement
-    std::size_t selectedJoint = 0;
-    bool targetMode = false;
-    // Toggle the limiting of joints
-    bool enforceJointLimits = true;
-
-    // ======= PATHWAY TRACING VARIABLES & SHAPES ========
-    robot_arm::PathwayShape pathwayShape = robot_arm::PathwayShape::None;
-    // Points for tracing out a pathway
-    std::vector<Vector3> pathwayPoints;
-    std::size_t currentWaypoint = 0;
-    bool pathwayMode = false;
-
-    float maximumApproximateReach = 0.0f;
-    float targetDistance = 0.0f;
-};
-
-Vector3 flipZY(Vector3 dhPos) 
-{
-    return {dhPos.x, dhPos.z, dhPos.y};
-}
 
 float estimateMaximumReach(const robot_arm::RobotModel& model)
 {
@@ -242,111 +211,10 @@ void updateRobot(SimulationState& state)
     }
 }
 
-void drawRobot(const SimulationState& state, const robot_arm::JointPositions& positions)
-{
-    // ========= DRAWING / TEXT / OUTPUT ==========
-    BeginMode3D(state.camera);
-    DrawGrid(40, 0.05f);
-    // Sphere for target coord
-    DrawSphere(flipZY(state.target), 0.018f, RED);
 
-    // Sphere for each joint, cylinder for each arm. Modified varaibles just for the base
-    for (std::size_t joint = 0; joint < robot_arm::kJointCount; ++joint) {
-        if (joint == 0) 
-        {
-            DrawCylinderEx(flipZY(positions[joint]), flipZY(Vector3{0.0f, 0.0f, 0.195f}), 0.025f, 0.025f, 30, GRAY);
-            DrawCylinderEx(flipZY(positions[joint]), flipZY(positions[joint + 1]), 0.005f, 0.005f, 30, GRAY);
-        }
-         else 
-        {
-            DrawCylinderEx(flipZY(positions[joint]), flipZY(positions[joint + 1]), 0.005f, 0.005f, 30, GRAY);
-            DrawSphere(flipZY(positions[joint]), 0.015f, BLACK);
-        }
-    }
-    // Last joint has a distinguishable colour (end point of arm)
-    DrawSphere(flipZY(positions.back()), 0.017f, GREEN);
-
-    // Pathway trajectory
-    for (std::size_t index = 0; index < state.pathwayPoints.size(); ++index) {
-        const bool isCurrent = index == state.currentWaypoint;
-        DrawSphere(
-            flipZY(state.pathwayPoints[index]),
-            isCurrent ? 0.025f : 0.015f,
-            isCurrent ? YELLOW : GRAY);
-    }
-
-    EndMode3D();
-}
-
-void drawInterface(const SimulationState& state)
-{
-    // Checks if robot is at home angles. From kinematics.hpp 
-    const bool atHome = robot_arm::isAtHomeAngles(state.angles, state.model.homeAngles);
-
-    // Text showing user interaction with theta of the joints
-    DrawText("6 DOF Robot Arm :: FK & IK Kinematics Prototype", 10, 10, 20, DARKGRAY);
-    DrawText(
-        TextFormat("Selected joint: %d [Buttons 1-6]",
-                   static_cast<int>(state.selectedJoint + 1)),
-        10,
-        40,
-        20,
-        BLACK);
-    DrawText(
-        TextFormat("theta[%d] = %.1f degrees",
-                   static_cast<int>(state.selectedJoint + 1),
-                   state.angles[state.selectedJoint] * RAD2DEG),
-        10,
-        70,
-        20,
-        BLACK);
-    DrawText(
-        TextFormat("Inverse kinematics: %s [0 to toggle, arrows + E,Q to navigate]",
-                   state.targetMode ? "ACTIVE" : "OFF"),
-        10,
-        100,
-        20,
-        RED);
-    DrawText(
-        TextFormat("Target: %.3f %.3f %.3f; error: %.4f",
-                   state.target.x,
-                   state.target.y,
-                   state.target.z,
-                   state.targetDistance),
-        10,
-        130,
-        20,
-        BLACK);
-    DrawText(
-        TextFormat("Pathway mode: %s (Button V)", state.pathwayMode ? "ON" : "OFF"),
-        10,
-        160,
-        20,
-        DARKGREEN);
-    DrawText(
-        TextFormat("Current shape: %s (Button C)",
-                   robot_arm::pathwayName(state.pathwayShape).data()),
-        10,
-        190,
-        20,
-        DARKGREEN);
-    DrawText(
-        TextFormat("Joint limits: %s (Button L)",
-                   state.enforceJointLimits ? "ON" : "OFF"),
-        10,
-        220,
-        20,
-        DARKGREEN);
-    DrawText(
-        TextFormat("Home Postition: %s ", 
-                    (atHome) ? "YES" : "NO"),
-        10,
-        250,
-        20,
-        GRAY);
-}
 
 } // namespace
+
 
 int main()
 {
@@ -369,7 +237,7 @@ int main()
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
-        drawRobot(state, positions);
+        drawRobot(state, positions, transforms);
         drawInterface(state);
         EndDrawing();
     }

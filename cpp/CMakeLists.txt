@@ -18,6 +18,7 @@ endif()
 add_library(robot_arm_core
     src/kinematics.cpp
     src/pathways.cpp
+    src/rendering.cpp
 )
 
 target_include_directories(robot_arm_core
