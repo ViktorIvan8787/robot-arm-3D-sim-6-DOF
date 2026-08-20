@@ -1,0 +1,9 @@
+# 720p camera settings
+camera:
+  width: 1280
+  height: 720
+  fps: 30
+
+# Current offset from base unkown (all set to 0)
+mount:
+  offset: [0.0, 0.0, 0.0]
