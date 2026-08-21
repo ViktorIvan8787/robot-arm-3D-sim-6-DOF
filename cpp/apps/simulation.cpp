@@ -1,8 +1,8 @@
 #include "robot_arm/kinematics.hpp"
 #include "robot_arm/pathways.hpp"
 #include "robot_arm/robot.hpp"
-#include "simulation_state/simulation_state.hpp"
-#include "visual_representation/rendering.hpp"
+#include "simulation_assets/simulation_state.hpp"
+#include "simulation_assets/rendering.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,6 +10,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <vector>
+#include <iostream>
 
 namespace {
 
@@ -21,11 +22,11 @@ constexpr float kCameraMovementSpeed = 3.0f;
 constexpr float kCameraMouseSensitivity = 0.7;
 constexpr float kCameraZoomSpeed = 2.0f;
 constexpr float kTargetMovementSpeed = 0.6f;
+constexpr float kOrientationStep = 45.0f * DEG2RAD;
 constexpr float kManualJointSpeed = 60.0f * DEG2RAD;
 constexpr float kPathRadius = 0.67f;
 constexpr float kWaypointTolerance = 0.02f;
 constexpr float kReachSafetyFactor = 0.85f;
-
 
 
 float estimateMaximumReach(const robot_arm::RobotModel& model)
@@ -70,13 +71,20 @@ void updateViewCamera(Camera3D& camera, float deltaTime)
     if (IsKeyDown(KEY_LEFT_SHIFT)) translation.z -= movement;
 
     // Sensitivity of the mouse in the camera
-    const Vector2 mouseDelta = GetMouseDelta();
+    Vector2 rotation {0.0f, 0.0f};
+    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+        const Vector2 mouseDelta = GetMouseDelta();
+        rotation.x = mouseDelta.x * kCameraMouseSensitivity;
+        rotation.y = mouseDelta.y * kCameraMouseSensitivity;
+        DisableCursor();
+    } if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+        EnableCursor();
+    }
+
     UpdateCameraPro(
         &camera,
         translation,
-        {mouseDelta.x * kCameraMouseSensitivity,
-         mouseDelta.y * kCameraMouseSensitivity,
-         0.0f},
+        {rotation.x, rotation.y, 0.0f},
         GetMouseWheelMove() * kCameraZoomSpeed);
 }
 
@@ -95,14 +103,30 @@ void updateTargetFromKeyboard(SimulationState& state, float deltaTime)
 {
     // ========= TARGET INTERACTION ==========
 
-    // Moving the target coordinate with the camera
+    // Moving the targetPosition coordinate with the camera
     const float movement = kTargetMovementSpeed * deltaTime;
-    if (IsKeyDown(KEY_UP)) state.target.z += movement;
-    if (IsKeyDown(KEY_DOWN)) state.target.z -= movement;
-    if (IsKeyDown(KEY_Q)) state.target.y += movement;
-    if (IsKeyDown(KEY_E)) state.target.y -= movement;
-    if (IsKeyDown(KEY_LEFT)) state.target.x += movement;
-    if (IsKeyDown(KEY_RIGHT)) state.target.x -= movement;
+    if (IsKeyDown(KEY_E)) state.targetPosition.z += movement;
+    if (IsKeyDown(KEY_Q)) state.targetPosition.z -= movement;
+    if (IsKeyDown(KEY_LEFT)) state.targetPosition.y += movement;
+    if (IsKeyDown(KEY_RIGHT)) state.targetPosition.y -= movement;
+    if (IsKeyDown(KEY_DOWN)) state.targetPosition.x += movement;
+    if (IsKeyDown(KEY_UP)) state.targetPosition.x -= movement;
+}
+
+void updateTargetOrientationFromKeyboard(SimulationState& state) 
+{
+    // ========= TARGET ORIENTATION USER INTERACTION =============
+    // Keys will alter orientation by kOrientationStep (current 45deg)
+    // once key is pressed. Helps appraoch objects from side
+
+    if (IsKeyPressed(KEY_MINUS)) state.targetOrientation = MatrixMultiply(state.targetOrientation, MatrixRotateY(kOrientationStep));
+    if (IsKeyPressed(KEY_EQUAL)) state.targetOrientation = MatrixMultiply(state.targetOrientation, MatrixRotateY(-kOrientationStep));
+
+    if (IsKeyPressed(KEY_LEFT_BRACKET)) state.targetOrientation = MatrixMultiply(state.targetOrientation, MatrixRotateX(kOrientationStep));
+    if (IsKeyPressed(KEY_RIGHT_BRACKET)) state.targetOrientation = MatrixMultiply(state.targetOrientation, MatrixRotateX(-kOrientationStep));
+
+    if (IsKeyPressed(KEY_APOSTROPHE)) state.targetOrientation = MatrixMultiply(state.targetOrientation, MatrixRotateZ(kOrientationStep));
+    if (IsKeyPressed(KEY_BACKSLASH)) state.targetOrientation = MatrixMultiply(state.targetOrientation, MatrixRotateZ(-kOrientationStep));
 }
 
 void updateManualJointControl(SimulationState& state, float deltaTime)
@@ -169,22 +193,23 @@ void handleInput(SimulationState& state, float deltaTime)
 
     updatePathwaySelection(state);
     updateTargetFromKeyboard(state, deltaTime);
+    updateTargetOrientationFromKeyboard(state);
     updateManualJointControl(state, deltaTime);
 }
 
 void updateRobot(SimulationState& state)
 {
     // ================== CALCULATIONS / FORWARD KINEMATICS ================
-    // If target mode is active, the arm automatically moves its joints toward
-    // the target. If not, each joint can be controlled manually.
+    // If targetPosition mode is active, the arm automatically moves its joints toward
+    // the targetPosition. If not, each joint can be controlled manually.
 
     // Pathway Mode Initiation
     if (state.pathwayMode && !state.pathwayPoints.empty()) {
-        state.target = state.pathwayPoints[state.currentWaypoint];
+        state.targetPosition = state.pathwayPoints[state.currentWaypoint];
     }
 
     // Create a fixed position for when the coordinates are out of reach.
-    Vector3 reachableTarget = state.target;
+    Vector3 reachableTarget = state.targetPosition;
     // If the coordinate is larger than the approximate maximum arm reach, it
     // is normalised and scaled so calculations continue at a reachable point.
     if (Vector3Length(reachableTarget) > state.maximumApproximateReach) {
@@ -199,6 +224,7 @@ void updateRobot(SimulationState& state)
             state.angles,
             state.model,
             reachableTarget,
+            state.targetOrientation,
             state.ikSettings,
             state.enforceJointLimits);
     }

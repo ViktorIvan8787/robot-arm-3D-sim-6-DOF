@@ -1,4 +1,4 @@
-#include "visual_representation/rendering.hpp"
+#include "simulation_assets/rendering.hpp"
 
 #include <raylib.h>
 #include <raymath.h>
@@ -130,7 +130,7 @@ void drawRobot(
     DrawGrid(40, 0.05f);
 
     // Target: a small crosshair gizmo instead of a plain sphere.
-    Vector3 targetDraw = flipZY(state.target);
+    Vector3 targetDraw = flipZY(state.targetPosition);
     constexpr float crosshairSize = 0.03f;
     DrawSphere(targetDraw, 0.01f, RED);
     DrawLine3D(Vector3Subtract(targetDraw, Vector3{crosshairSize, 0, 0}), Vector3Add(targetDraw, Vector3{crosshairSize, 0, 0}), RED);
@@ -214,9 +214,9 @@ void drawInterface(const SimulationState& state)
         RED);
     DrawText(
         TextFormat("Target: %.3f %.3f %.3f; error: %.4f",
-                   state.target.x,
-                   state.target.y,
-                   state.target.z,
+                   state.targetPosition.x,
+                   state.targetPosition.y,
+                   state.targetPosition.z,
                    state.targetDistance),
         10,
         130,

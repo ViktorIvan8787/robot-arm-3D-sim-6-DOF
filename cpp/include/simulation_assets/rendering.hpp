@@ -1,7 +1,7 @@
 #pragma once 
 
 #include "robot_arm/kinematics.hpp"
-#include "simulation_state/simulation_state.hpp"
+#include "simulation_assets/simulation_state.hpp"
 
 void drawRobot(
     const SimulationState& state,

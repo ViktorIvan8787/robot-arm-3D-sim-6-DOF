@@ -14,10 +14,15 @@ struct IKSettings {
     float minimumDamping = 0.01f;
     float maximumDamping = 0.30f;
     float singularityThreshold = 0.05f;
-    float maximumStepRadians = 0.02f;
+    float maximumStepRadians = 0.03f;
 };
 
 Matrix dhTransform(float theta, float d, float a, float alpha);
+
+Vector3 computeOrientationError(
+    Matrix current,
+    Matrix targetPosition
+);
 
 void forwardKinematics(
     const JointAngles& angles,
@@ -31,7 +36,8 @@ void forwardKinematics(
 float performIKStep(
     JointAngles& angles,
     const RobotModel& model,
-    Vector3 target,
+    Vector3 targetPosition,
+    Matrix targetOrientation,
     const IKSettings& settings,
     bool enforceJointLimits
 );

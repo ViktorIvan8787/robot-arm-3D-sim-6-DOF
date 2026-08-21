@@ -72,7 +72,7 @@ inline RobotModel createDefaultRobotModel()
             90.0f * DEG2RAD,
             10000.0f * DEG2RAD, // Infinite (no limit)
         },
-        {0.0f * DEG2RAD, -30.0f * DEG2RAD, 90.0f * DEG2RAD, 0.0f * DEG2RAD, 90.0f * DEG2RAD, 0.0f * DEG2RAD}, // homeAngles - starting angles position
+        {0.1f * DEG2RAD, -30.0f * DEG2RAD, 90.0f * DEG2RAD, 0.0f * DEG2RAD, 90.0f * DEG2RAD, 0.0f * DEG2RAD}, // homeAngles - starting angles position
     };
 }
 

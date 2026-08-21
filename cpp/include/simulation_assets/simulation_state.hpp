@@ -5,6 +5,7 @@
 #include "robot_arm/robot.hpp"
 
 #include <cstddef>
+#include <raymath.h>
 #include <raylib.h>
 #include <vector>
 
@@ -22,9 +23,11 @@ struct SimulationState {
 
     // ========= TARGET / IK TRACKING ========
     // Robot target coordinates (user interactable)
-    Vector3 target {-0.3f, 0.0f, 0.3f};
+    Vector3 targetPosition = {-0.3f, 0.0f, 0.3f};
     bool targetMode = false;
     float targetDistance = 0.0f;
+    // Target orientation (angle robot approaches from)
+    Matrix targetOrientation = MatrixRotateX(180.0f * DEG2RAD); // Comes from above (Z)
 
     // ========== ARM USER CONTROL ==========
     std::size_t selectedJoint = 0;
