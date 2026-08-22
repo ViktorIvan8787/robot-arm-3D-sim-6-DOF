@@ -34,3 +34,10 @@ for image in results:
         class_name = model.name[int(object.cls[0])]
         # get the confidence for this object 
         confidence = float(object.conf[0])
+
+        # check if it is the right object
+        if target_class == class_name:
+            # Get centre coordinates of the object
+            x , y , _ , _ = object.xywh[0]
+            # Print out that object has been found for test units and debugging
+            print(f"{target_class} object found, (conf {confidence:.2f}) at pixel coordinates ({x:.0f}, {y:.0f})")
